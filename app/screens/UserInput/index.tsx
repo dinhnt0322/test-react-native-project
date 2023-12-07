@@ -1,5 +1,6 @@
-import moment from 'moment';
-import React, {useContext, useRef} from 'react';
+/* eslint-disable react/no-unstable-nested-components */
+import {TransitionPresets} from '@react-navigation/stack';
+import React, {useContext, useEffect, useRef} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import CustomDatePicker, {
   RefCustomDatePicker,
@@ -9,16 +10,42 @@ import CustomTextInput, {
 } from '../../components/CustomTextInput';
 import NationPicker, {RefNationPicker} from '../../components/NationPicker';
 import {UserInputContext} from '../../context';
+import axiosServices from '../../services/AxiosServices';
 import {RootStackScreenProps} from '../MainNavigator';
 
-const UserInput = ({route, navigation}: RootStackScreenProps<'UserInput'>) => {
+const UserInput = ({navigation}: RootStackScreenProps<'UserInput'>) => {
   const styles = createStyle();
   const nameRef = useRef<RefCustomInput>(null);
   const birthDayRef = useRef<RefCustomDatePicker>(null);
   const countryRef = useRef<RefNationPicker>(null);
-  const {setUsers} = useContext(UserInputContext);
+  const {setUsers, setSearchKey} = useContext(UserInputContext);
 
-  const onSubmit = () => {
+  const navigationOptions = {
+    ...TransitionPresets.SlideFromRightIOS,
+    headerStyle: {
+      backgroundColor: '#FFFFFF',
+    },
+    headerRight: () => (
+      <Pressable
+        onPress={() => {
+          navigation.navigate('UserList');
+        }}
+        style={styles.headerButton}>
+        <Text style={{fontSize: 28}}>☲</Text>
+      </Pressable>
+    ),
+    headerTitle: () => <Text style={styles.headerTitle}>Input User</Text>,
+  };
+
+  const updateNavBar = () => {
+    navigation.setOptions(navigationOptions);
+  };
+
+  useEffect(() => {
+    updateNavBar();
+  }, []);
+
+  const onSubmit = async () => {
     if (!nameRef.current || !birthDayRef.current || !countryRef.current) {
       return;
     }
@@ -29,16 +56,35 @@ const UserInput = ({route, navigation}: RootStackScreenProps<'UserInput'>) => {
       return;
     }
 
-    const selectedUser = {
-      id: moment().unix().toString(),
-      fullName: nameRef.current.value,
-      birthDay: birthDayRef.current.value,
-      nation: countryRef.current.value,
-    };
-    !!setUsers && setUsers(state => [...state, selectedUser]);
     nameRef.current.resetValue();
     birthDayRef.current.resetValue();
     countryRef.current.resetValue();
+
+    const searchName = nameRef.current.value;
+    const rawData = await axiosServices.POST({
+      route: 'https://search.ofac-api.com/v3',
+      body: {
+        apiKey: 'c604aea8-72a4-41bc-aca3-f6988677e209',
+        minScore: 95,
+        source: ['SDN'],
+        cases: [
+          {
+            name: nameRef.current.value,
+          },
+        ],
+      },
+    });
+    const responseUser = rawData.data?.matches[searchName].map(item => ({
+      fullName: item.fullName,
+      firstName: item.firstName,
+      lastName: item.lastName,
+      id: item.uid,
+      birthDay: item.dob,
+      nation: '',
+    }));
+
+    !!setUsers && setUsers(responseUser);
+    !!setSearchKey && setSearchKey(searchName);
     navigation.navigate('UserList');
   };
   return (
@@ -68,7 +114,7 @@ const UserInput = ({route, navigation}: RootStackScreenProps<'UserInput'>) => {
       </ScrollView>
       <View style={styles.btnContainer}>
         <Pressable style={styles.button} onPress={onSubmit}>
-          <Text style={styles.btnText}>Add New User</Text>
+          <Text style={styles.btnText}>Add & View List User</Text>
         </Pressable>
       </View>
     </View>
@@ -114,4 +160,12 @@ const createStyle = () =>
       justifyContent: 'center',
       backgroundColor: '#FFFFFF',
     },
+    headerButton: {
+      marginRight: 16,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {fontSize: 20, lineHeight: 24, fontWeight: '600'},
   });

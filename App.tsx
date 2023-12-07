@@ -6,8 +6,10 @@ import MainNavigator from './app/screens/MainNavigator';
 LogBox.ignoreAllLogs(__DEV__);
 const App = () => {
   const [users, setUsers] = useState<UserInfo[]>([]);
+  const [searchKey, setSearchKey] = useState<string>('');
   return (
-    <UserInputContext.Provider value={{users, setUsers}}>
+    <UserInputContext.Provider
+      value={{users, setUsers, searchKey, setSearchKey}}>
       <NavigationContainer>
         <MainNavigator />
       </NavigationContainer>

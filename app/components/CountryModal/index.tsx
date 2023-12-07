@@ -1,17 +1,14 @@
-import React from 'react';
+import React, {useCallback, useRef} from 'react';
 import {
   Dimensions,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import Modal from 'react-native-modal';
-const countries: {
-  name: string;
-  code: string;
-}[] = require('../assets/countries.json');
+import {NationType} from '../types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -19,19 +16,40 @@ const CountryModal = ({
   isVisibleModal,
   setIsVisibleModal,
   onConfirm,
-  selectedCountry,
+  selectedNation,
+  nations,
 }: {
   isVisibleModal: boolean;
   setIsVisibleModal: (value: boolean) => void;
-  onConfirm?: (value: string) => void;
-  selectedCountry: string;
+  onConfirm?: (value: NationType) => void;
+  selectedNation: NationType | null;
+  nations: NationType[];
 }) => {
+  const flatListRef = useRef<FlatList>(null);
   const onClose = () => {
     setIsVisibleModal(false);
   };
 
   const styles = createStyle();
 
+  // useEffect(() => {
+  //   if (selectedNation && isVisibleModal) {
+  //     setTimeout(() => {
+  //       flatListRef.current?.scrollToItem({
+  //         animated: true,
+  //         item: selectedNation,
+  //       });
+  //     }, 600);
+  //   }
+  // }, [selectedNation, isVisibleModal]);
+  const getItemLayout = useCallback(
+    (data, index: number) => ({
+      length: 65,
+      offset: 65 * index,
+      index,
+    }),
+    [],
+  );
   return (
     <Modal
       style={styles.container}
@@ -46,17 +64,27 @@ const CountryModal = ({
       swipeDirection={['down']}>
       <View style={styles.modalHeader} />
       <View style={styles.modalContainer}>
-        <ScrollView>
-          {countries.map(item => (
+        <FlatList
+          ref={flatListRef}
+          data={nations}
+          initialScrollIndex={
+            nations.findIndex(item => item.id === selectedNation?.id) - 5
+          }
+          windowSize={70}
+          initialNumToRender={20}
+          maxToRenderPerBatch={25}
+          renderItem={({item}) => (
             <Pressable
               style={styles.itemContainer}
-              onPress={() => onConfirm && onConfirm(item.name)}
-              key={item.code}>
-              <Text>{item.name}</Text>
-              {item.name === selectedCountry && <Text>✔</Text>}
+              onPress={() => onConfirm && onConfirm(item)}
+              key={item.id}>
+              <Text>{`${item.flag} ${item.name}`}</Text>
+              {item.id === selectedNation?.id && <Text>✔</Text>}
             </Pressable>
-          ))}
-        </ScrollView>
+          )}
+          keyExtractor={item => item.id}
+          getItemLayout={getItemLayout}
+        />
       </View>
     </Modal>
   );

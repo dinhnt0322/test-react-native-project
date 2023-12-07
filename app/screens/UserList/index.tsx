@@ -1,18 +1,83 @@
-import moment from 'moment';
-import React, {useContext} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+/* eslint-disable react/no-unstable-nested-components */
+import {TransitionPresets} from '@react-navigation/stack';
+import React, {useContext, useEffect, useState} from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {UserInputContext} from '../../context';
+import axiosServices from '../../services/AxiosServices';
 import {RootStackScreenProps} from '../MainNavigator';
 
-const UserList = ({route, navigation}: RootStackScreenProps<'UserList'>) => {
+const UserList = ({navigation}: RootStackScreenProps<'UserList'>) => {
   const styles = createStyle();
-  const {users} = useContext(UserInputContext);
+  const {users, searchKey, setUsers} = useContext(UserInputContext);
+  const [isRefresh, setIsRefresh] = useState(false);
+  const navigationOptions = {
+    ...TransitionPresets.SlideFromRightIOS,
+    headerStyle: {
+      backgroundColor: '#FFFFFF',
+    },
+
+    headerLeft: () => (
+      <Pressable onPress={navigation.goBack} style={styles.headerButton}>
+        <Text style={{fontSize: 30}}>‹</Text>
+      </Pressable>
+    ),
+    headerTitle: () => <Text style={styles.headerTitle}>User List</Text>,
+  };
+
+  const updateNavBar = () => {
+    navigation.setOptions(navigationOptions);
+  };
+
+  useEffect(() => {
+    updateNavBar();
+  }, []);
   const onAddNewUser = () => {
     navigation.navigate('UserInput');
   };
+
+  const refreshUserList = async () => {
+    setIsRefresh(true);
+    const rawData = await axiosServices.POST({
+      route: 'https://search.ofac-api.com/v3',
+      body: {
+        apiKey: 'c604aea8-72a4-41bc-aca3-f6988677e209',
+        minScore: 95,
+        source: ['SDN'],
+        cases: [
+          {
+            name: searchKey,
+          },
+        ],
+      },
+    });
+    const responseUser = rawData.data?.matches[searchKey].map(item => ({
+      fullName: item.fullName,
+      firstName: item.firstName,
+      lastName: item.lastName,
+      id: item.uid,
+      birthDay: item.dob,
+      nation: '',
+    }));
+
+    !!setUsers && setUsers(responseUser);
+    setIsRefresh(false);
+  };
+
   return (
     <View style={{flex: 1}}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefresh} onRefresh={refreshUserList} />
+        }>
         <Text style={styles.title}>List of User</Text>
         <View style={{borderWidth: 1}}>
           <View style={styles.headerContainer}>
@@ -48,9 +113,7 @@ const UserList = ({route, navigation}: RootStackScreenProps<'UserList'>) => {
                     {flex: 3, borderLeftWidth: 1, borderRightWidth: 1},
                     styles.center,
                   ]}>
-                  <Text style={styles.itemText}>
-                    {moment(moment.unix(item.birthDay)).format('DD/MM/YYYY')}
-                  </Text>
+                  <Text style={styles.itemText}>{item.birthDay}</Text>
                 </View>
                 <View style={[{flex: 3}, styles.center]}>
                   <Text style={styles.itemText} numberOfLines={1}>
@@ -64,7 +127,7 @@ const UserList = ({route, navigation}: RootStackScreenProps<'UserList'>) => {
       </ScrollView>
       <View style={styles.btnContainer}>
         <Pressable style={styles.button} onPress={onAddNewUser}>
-          <Text style={styles.btnText}>Add & View List User</Text>
+          <Text style={styles.btnText}>Add New User</Text>
         </Pressable>
       </View>
     </View>
@@ -138,4 +201,12 @@ const createStyle = () =>
       flexDirection: 'row',
       borderBottomWidth: 1,
     },
+    headerButton: {
+      marginLeft: 16,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {fontSize: 20, lineHeight: 24, fontWeight: '600'},
   });
